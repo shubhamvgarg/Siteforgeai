@@ -1,33 +1,82 @@
 # SiteForge AI
 
-## Description
-SiteForge AI is an AI-powered tool for generating website requirements based on user input. This project is in its initial development stage and uses LangGraph and LangChain to analyze user ideas and produce structured requirements for website creation.
+SiteForge AI is a Streamlit-based project builder powered by a custom LangGraph agent. Enter a project idea, then watch the app run the agent and display live execution logs plus the final agent result.
 
-## Installation
-1. Clone the repository.
-2. Install dependencies:
-   ```
-   pip install -r requirements.txt
-   ```
-3. Set up environment variables (e.g., API keys for NVIDIA AI endpoints) in a `.env` file.
+## Features
 
-## Usage
-Run the main graph to analyze user input:
-```python
-from graph import build_graph
+- Interactive **Streamlit UI** for prompt entry
+- Live agent output logging during generation
+- Final agent result displayed in the app
+- Built with **LangGraph**, **LangChain**, and **Groq**
 
-app_graph = build_graph()
-user_input = "Describe your website idea here."
-result = app_graph.invoke({"user_input": user_input})
-print(result['requirements'])
+## Project Structure
+
+- `app.py` - main Streamlit app and orchestration logic
+- `requirements.txt` - Python dependencies
+- `agent/` - custom agent implementation and supporting modules
+  - `graph.py`
+  - `nodes.py`
+  - `prompts.py`
+  - `states.py`
+  - `tools.py`
+
+## Getting Started
+
+1. Create and activate a Python virtual environment:
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
 ```
 
-## Requirements
-- Python 3.x
-- Dependencies listed in `requirements.txt`
+2. Install dependencies:
 
-## Current Status
-This project is in its initial state. Core functionality includes input analysis and requirements generation. Future updates will expand features and improve the system.
+```bash
+pip install -r requirements.txt
+```
 
-## Contributing
-Contributions are welcome. Please submit issues or pull requests for improvements.
+3. Configure your Groq API credentials (required):
+
+- Create a paid Groq account and get your API key.
+- Create a `.env` file in the project root.
+- Add your API key to `.env`.
+
+```env
+GROQ_API_KEY=your_paid_groq_api_key_here
+```
+
+4. Run the Streamlit app:
+
+```bash
+streamlit run app.py
+```
+
+5. Open the local Streamlit URL shown in the terminal.
+
+## Configuration
+
+This project uses `langchain_groq` and loads environment variables from a `.env` file via `python-dotenv`.
+
+Required environment variable:
+
+- `GROQ_API_KEY` — your paid Groq API key.
+
+Optional environment variables:
+
+- `GROQ_BASE_URL` — custom Groq API base URL if you are using a non-default endpoint.
+
+## Usage
+
+- Enter a clear project idea in the input box.
+- Click **Build Project**.
+- Watch the live agent log output while the model runs.
+- View the final agent result inside the app once generation completes.
+
+## Notes
+
+- The app captures both `stdout` and `stderr` from the agent and streams it to the UI.
+- Use **Start New Build** to reset the interface and run a new prompt.
+
+## License
+
+This project does not include a license file. Add one if you want to open source or share the code with others.
