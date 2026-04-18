@@ -84,6 +84,6 @@ This project does not include a license file. Add one if you want to open source
 ## Here is one example of generated app in "generated_project"
 
 <img width="1861" height="506" alt="image" src="https://github.com/user-attachments/assets/e70e13d3-d8cf-4122-a092-357a6651aec4" />
-### After giving inputs
+## After giving inputs
 <img width="1856" height="615" alt="image" src="https://github.com/user-attachments/assets/3c89c0b0-0212-4f4b-be11-2bc6eba65ebb" />
 
