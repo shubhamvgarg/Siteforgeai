@@ -1,43 +1,80 @@
-from langchain_nvidia_ai_endpoints import ChatNVIDIA
 from dotenv import load_dotenv
-from state import *
-load_dotenv()
+from langchain_core.globals import set_verbose, set_debug
+from langchain_groq.chat_models import ChatGroq
+from langchain.agents import create_agent
+from tools import write_file, read_file, get_current_directory, list_files,run_cmd
+from prompts import *
+from states import *
 
-def get_llm():
-    return ChatNVIDIA(
-        # model="nvidia/ising-calibration-1-35b-a3b",
-        model="google/gemma-3n-e4b-it",
-        temperature=0.2,
-        top_p=0.7,
-    max_tokens=1024,
-  )
+_ = load_dotenv()
 
-def analyse_input(state):
-    user_input = state.get("user_input")
+set_debug(True)
+set_verbose(True)
 
-    structured_llm = get_llm().with_structured_output(PromptOutput)
+llm = ChatGroq(model="openai/gpt-oss-120b", temperature=0.2, timeout=30)
 
-    prompt = f"""
-    Analyze the following user input and generate a clear, high-quality plain English prompt
-    that can be used to create a website.
+def planner_agent(state: dict) -> dict:
+    """Converts user prompt into a structured Plan."""
+    user_prompt = state["user_prompt"]
+    resp = llm.with_structured_output(Plan).invoke(
+        planner_prompt(user_prompt)
+    )
+    if resp is None:
+        raise ValueError("Planner did not return a valid response.")
+    #print(resp)
+    return {"plan": resp}
 
-    User input: {user_input}
-    """
 
-    res = structured_llm.invoke(prompt)
+def architect_agent(state: dict) -> dict:
+    """Creates TaskPlan from Plan."""
+    plan: Plan = state["plan"]
+    resp = llm.with_structured_output(TaskPlan).invoke(
+        architect_prompt(plan=plan.model_dump_json())
+    )
+    if resp is None:
+        raise ValueError("Planner did not return a valid response.")
 
-    return {"prompt_to_use_from_user": res.website_prompt}
+    resp.plan = plan
 
-def analyse_requirements(state):
-    prompt_to_use_from_user = state.get("prompt_to_use_from_user")
-    structured_llm = get_llm().with_structured_output(RequirementsOutput)
+    return {"task_plan": resp}
 
-    prompt = f"""
-    You are a Technical lead Senior developer and Analyze the following user input and breakdown high-quality plain English requirements required for given input
 
-    User input: {prompt_to_use_from_user}
-    """
 
-    res = structured_llm.invoke(prompt)
+def coder_agent(state: dict) -> dict:
+    """LangGraph tool-using coder agent."""
+    coder_state: CoderState = state.get("coder_state")
+    if coder_state is None:
+        coder_state = CoderState(task_plan=state["task_plan"], current_step_idx=0)
 
-    return {"requirements": res}
+    steps = coder_state.task_plan.implementation_steps
+    if coder_state.current_step_idx >= len(steps):
+        return {"coder_state": coder_state, "status": "DONE"}
+
+    current_task = steps[coder_state.current_step_idx]
+    existing_content = read_file.run(current_task.filepath)
+
+    system_prompt = coder_system_prompt()
+    user_prompt = (
+        f"Task: {current_task.task_description}\n"
+        f"File: {current_task.filepath}\n"
+        f"Existing content:\n{existing_content}\n"
+        "Use write_file(path, content) to save your changes."
+    )
+
+    coder_tools = [read_file, write_file, list_files, get_current_directory,run_cmd]
+
+    agent = create_agent(
+        model=llm,
+        tools=coder_tools,
+        system_prompt=system_prompt,
+    )
+
+    agent.invoke({
+        "messages": [
+            {"role": "user", "content": user_prompt}
+        ]
+    })
+
+    coder_state.current_step_idx += 1
+
+    return {"coder_state": coder_state}
