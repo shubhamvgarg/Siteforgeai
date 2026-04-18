@@ -1,27 +1,45 @@
-from langgraph.graph import StateGraph, START, END
-from state import InitialState
-from rich import print
+from langchain_core.globals import set_verbose, set_debug
+from langgraph.constants import END
+from langgraph.graph import StateGraph
+from langgraph.checkpoint.sqlite import SqliteSaver
+from nodes import *
+import sqlite3
 
-from nodes import analyse_input,analyse_requirements
+set_debug(True)
+set_verbose(True)
 
-def build_graph():
-    graph = StateGraph(InitialState)
-    graph.add_node("analyse_input", analyse_input)
-    graph.add_node("analyse_requirements", analyse_requirements)
+# Create SQLite connection
+conn = sqlite3.connect("agent_state.db", check_same_thread=False)
 
-    graph.add_edge(START, "analyse_input")
-    graph.add_edge("analyse_input", "analyse_requirements")
-    graph.add_edge("analyse_requirements", END)
-    return graph.compile()
+# Initialize checkpointer
+checkpointer = SqliteSaver(conn)
 
+graph = StateGraph(dict)
+
+graph.add_node("planner", planner_agent)
+graph.add_node("architect", architect_agent)
+graph.add_node("coder", coder_agent)
+
+graph.add_edge("planner", "architect")
+graph.add_edge("architect", "coder")
+
+graph.add_conditional_edges(
+    "coder",
+    lambda s: "END" if s.get("status") == "DONE" else "coder",
+    {"END": END, "coder": "coder"}
+)
+
+graph.set_entry_point("planner")
+
+agent = graph.compile(checkpointer=checkpointer)
 
 if __name__ == "__main__":
-    app_graph = build_graph()
-    user_input = "I want to create a website for my new cafe that serves organic coffee and pastries using reactJs and nodeJs with a modern and minimalist design. The website should have an online menu, reservation system, and a blog section for sharing news and updates about the cafe."
-    # user_input = input("Enter your Idea you want to create: ")
-    result = app_graph.invoke({
-        "user_input": user_input,
-    })
-
-
-    print(result['requirements'])
+    user_prompt = input("Enter your Idea: ")
+    result = agent.invoke(
+        {"user_prompt": user_prompt},
+        {
+            "recursion_limit": 100,
+            "configurable": {"thread_id": "todo-app-1"}  # important for persistence
+        }
+    )
+    print("Final State:", result)
